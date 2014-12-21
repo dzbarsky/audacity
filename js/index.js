@@ -6,6 +6,7 @@ var context;
 var currentTrackDiv;
 var currentDrawn = 0;
 var SAMPLES_PER_PIXEL = 200;
+var finalBuffer;
 
 function setup() {
   document.getElementById('record').addEventListener('click', toggleRecord);
@@ -35,7 +36,8 @@ function toggleRecord() {
 
 
     buffers = [];
-    navigator.mozGetUserMedia(
+    navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia;
+    navigator.getUserMedia(
       { audio: true },
       success,
       function(err) {
@@ -45,16 +47,16 @@ function toggleRecord() {
    }
 }
 
-function makeTotalBuffer() {
+function createFinalBuffer() {
 
   var totalLength = 0;
   buffers.forEach(function (buffer) {
     totalLength += buffer.length;
   });
 
-  var tmp = context.createBuffer(2, totalLength, buffers[0].sampleRate);
+  finalBuffer = context.createBuffer(2, totalLength, buffers[0].sampleRate);
   for (var i = 0; i < 2; i++) {
-    var channel = tmp.getChannelData(i);
+    var channel = finalBuffer.getChannelData(i);
 
     var currentLength = 0;
     buffers.forEach(function (buffer) {
@@ -62,21 +64,13 @@ function makeTotalBuffer() {
       currentLength += buffer.length;
     });
   }
-
-  return tmp;
 }
 
-function createFinalBuffer() {
-  var tmp = makeTotalBuffer();
-
-  currentTrackDiv.addEventListener('click', function() {
-    var source = context.createBufferSource();
-    source.buffer = tmp;
-    source.connect(context.destination);
-    source.start();
-  });
-
-  return tmp;
+function play() {
+  var source = context.createBufferSource();
+  source.buffer = finalBuffer;
+  source.connect(context.destination);
+  source.start();
 }
 
 var buffers = [];
