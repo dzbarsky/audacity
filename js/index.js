@@ -1,7 +1,6 @@
 window.addEventListener('load', setup);
 
 var state;
-var currentStream;
 var context;
 var currentTrackDiv;
 var currentDrawn = 0;
@@ -24,7 +23,6 @@ function setup() {
 
 function toggleRecord() {
   if (state === 'recording') {
-    currentStream.stop();
     document.getElementById('record').src = 'images/record.png';
     state = 'stopped';
     createFinalBuffer();
@@ -33,6 +31,7 @@ function toggleRecord() {
     state = 'recording';
 
     currentTrackDiv = document.createElement("div");
+    currentDrawn = 0;
     document.getElementById('tracks').appendChild(currentTrackDiv);
 
     var canvas = document.createElement("canvas");
@@ -76,7 +75,6 @@ function play() {
 var buffers = [];
 
 function success(audioStream) {
-  currentStream = audioStream;
   context = new AudioContext();
 
   //var volume = context.createGain();
@@ -87,6 +85,7 @@ function success(audioStream) {
     if (state !== 'recording') {
       return;
     }
+    console.log('recording');
     buffers.push(e.inputBuffer);
 
     var canvas = currentTrackDiv.firstChild;
