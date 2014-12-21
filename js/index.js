@@ -12,7 +12,15 @@ function setup() {
   document.getElementById('record').addEventListener('click', toggleRecord);
   document.getElementById('play').addEventListener('click', play);
   document.getElementById('pause').addEventListener('click', pause);
-}
+  navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia;
+  navigator.getUserMedia(
+    { audio: true },
+    success,
+    function(err) {
+      console.log("The following error occured: " + err);
+    }
+  );
+ }
 
 function toggleRecord() {
   if (state === 'recording') {
@@ -36,15 +44,7 @@ function toggleRecord() {
 
 
     buffers = [];
-    navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia;
-    navigator.getUserMedia(
-      { audio: true },
-      success,
-      function(err) {
-        console.log("The following error occured: " + err);
-      }
-    );
-   }
+  }
 }
 
 function createFinalBuffer() {
@@ -91,16 +91,19 @@ function success(audioStream) {
 
     var canvas = currentTrackDiv.firstChild;
 
-    var newCanvas = document.createElement("canvas");
-    newCanvas.width = canvas.width + e.inputBuffer.length / SAMPLES_PER_PIXEL;
-    newCanvas.height = canvas.height;
-    canvas.remove();
-    currentTrackDiv.appendChild(newCanvas);
+    var canvasContext = canvas.getContext('2d');
+    var oldWidth = canvas.width;
+    if (oldWidth !== 0) {
+      var data = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+    }
+    canvas.width += e.inputBuffer.length / SAMPLES_PER_PIXEL;
 
-    newCanvas.getContext('2d').drawImage(canvas, 0, 0);
-    drawBuffer(newCanvas.width,
-               newCanvas.height,
-               newCanvas.getContext('2d'),
+    if (oldWidth !== 0) {
+      canvasContext.putImageData(data, 0, 0);
+    }
+    drawBuffer(canvas.width,
+               canvas.height,
+               canvasContext,
                e.inputBuffer.getChannelData(0));
   };
 
