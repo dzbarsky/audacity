@@ -1,5 +1,5 @@
 {
-  "name": "Atlas",
+  "name": "audio",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -9,16 +9,7 @@
     "node": "0.11.x"
   },
   "dependencies": {
-    "body-parser": "~1.0.0",
-    "cookie-parser": "~1.0.1",
-    "debug": "~0.7.4",
-    "ejs": "^1.0.0",
-    "express": "~4.2.0",
-    "express-session": "^1.7.2",
-    "mongodb": "^1.4.7",
-    "morgan": "~1.0.0",
-    "passport": "*",
-    "passport-facebook": "*",
-    "static-favicon": "~1.0.0"
+    "connect": "^3.3.3",
+    "serve-static": "^1.7.1"
   }
 }
