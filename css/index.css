@@ -5,11 +5,20 @@
   background-color: black;
 }
 
-.left-bar {
+#track-control-container {
+  display: inline-block;
   width: 100px;
+}
+
+#track-container {
+  display: inline-block;
+  overflow: auto;
+  width: 600px;
+}
+
+.track-control {
   height: 204px;
   background-color: green;
-  display: inline-block;
 }
 
 .canvas-container {

@@ -9,25 +9,24 @@ var tracks = []
 var nodes = {};
 
 function AudioTrack() {
-  var domElement = document.createElement("div");
-  document.getElementById('tracks').appendChild(domElement);
-
   var closeButton = document.createElement("div");
   closeButton.addEventListener('click', function() {
-    domElement.remove();
+    trackControl.remove();
+    canvasContainer.remove();
     tracks.splice(tracks.indexOf(this), 1);
   }.bind(this));
   closeButton.textContent = 'X';
   closeButton.classList.add('close-button');
 
-  var leftBar = document.createElement("div");
-  leftBar.classList.add('left-bar');
-  leftBar.appendChild(closeButton);
-  domElement.appendChild(leftBar);
+  var trackControl = document.createElement("div");
+  trackControl.classList.add('track-control');
+  trackControl.appendChild(closeButton);
+  document.getElementById('track-control-container').appendChild(trackControl);
 
   var canvasContainer = document.createElement('div');
   canvasContainer.classList.add('canvas-container');
-  domElement.appendChild(canvasContainer);
+  document.getElementById('track-container').appendChild(canvasContainer);
+
   this.canvases = [];
   for (var i = 0; i < 2; i++) {
     this.canvases.push(document.createElement("canvas"));
@@ -127,7 +126,7 @@ function setup() {
   document.getElementById('record').addEventListener('click', toggleRecord);
   document.getElementById('play').addEventListener('click', play);
   document.getElementById('pause').addEventListener('click', pause);
-  document.getElementById('tracks').addEventListener('click', clickTrackHandler);
+  document.getElementById('track-container').addEventListener('click', clickTrackHandler);
 
   document.body.addEventListener('keydown', keydown);
   navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
@@ -180,7 +179,7 @@ function play() {
   var animateScrubber = function() {
     var elapsed = Date.now() - playStart;
     document.getElementById('scrubber').style.left =
-      elapsed /1000 * SAMPLES_PER_PIXEL + 'px';
+      elapsed / 1000 * SAMPLES_PER_PIXEL + 'px';
     requestAnimationFrame(animateScrubber);
   };
   requestAnimationFrame(animateScrubber);
