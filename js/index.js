@@ -24,6 +24,7 @@ function AudioTrack() {
   document.getElementById('track-control-container').appendChild(trackControl);
 
   var canvasContainer = document.createElement('div');
+  canvasContainer.track = this;
   canvasContainer.classList.add('canvas-container');
   document.getElementById('track-container').appendChild(canvasContainer);
 
@@ -84,6 +85,7 @@ AudioTrack.prototype.addBufferSegment = function(bufferSegment) {
   }
 
   this.currentDrawn += bufferSegment.length / SAMPLES_PER_PIXEL;
+  this.scrubberIndex = 0;
 };
 
 AudioTrack.prototype.drawBuffer = function(context, width, data) {
@@ -117,9 +119,31 @@ AudioTrack.prototype.drawBuffer = function(context, width, data) {
 
 AudioTrack.prototype.play = function() {
   var source = context.createBufferSource();
-  source.buffer = this.finalBuffer;
+
+  var newLength = this.finalBuffer.length - this.scrubberIndex;
+  var playBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
+  for (var i = 0; i < 2; i++) {
+    playBuffer.copyToChannel(this.finalBuffer.getChannelData(i).subarray(this.scrubberIndex), i);
+  }
+
+  source.buffer = playBuffer;
   source.connect(context.destination);
   source.start();
+};
+
+AudioTrack.prototype.setScrubber = function(e) {
+  console.log(e);
+  var scrubber = document.getElementById('scrubber');
+
+  var parent = e.target.parentNode;
+  var box = parent.getBoundingClientRect();
+
+  parent.appendChild(scrubber);
+  scrubber.style.left = e.clientX + 'px';
+  console.log(box.top);
+  scrubber.style.top = box.top + 'px';
+
+  this.scrubberIndex = e.clientX * SAMPLES_PER_PIXEL;
 };
 
 function setup() {
@@ -199,6 +223,6 @@ function success(audioStream) {
 }
 
 function clickTrackHandler(e) {
-  console.log(e);
-  document.getElementById('scrubber').style.left = e.clientX + 'px';
+  var track = e.target.parentNode.track;
+  track.setScrubber(e);
 }
