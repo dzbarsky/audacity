@@ -2,7 +2,7 @@ window.addEventListener('load', setup);
 
 var state;
 var context;
-var SAMPLES_PER_PIXEL = 200;
+var SAMPLES_PER_PIXEL = 256;
 
 var currentTrack;
 var tracks = []
@@ -90,19 +90,29 @@ AudioTrack.prototype.addBufferSegment = function(bufferSegment) {
 AudioTrack.prototype.drawBuffer = function(context, width, data) {
   var amp = this.canvases[0].height / 2;
   context.fillStyle = "silver";
-  console.log(width - this.currentDrawn)
-  for (var i = 0; i < width - this.currentDrawn; i++){
-    var min = 1.0;
-    var max = -1.0;
-    for (j = 0; j < SAMPLES_PER_PIXEL; j++) {
-      var datum = data[(i * SAMPLES_PER_PIXEL) + j];
-      if (datum < min)
-        min = datum;
-      if (datum > max)
-        max = datum;
-     }
-     context.fillRect(i + this.currentDrawn, (1 + min) * amp,
-                      1, Math.max(1, (max - min) * amp));
+
+  var min = 1.0;
+  var max = -1.0;
+  var currentSample = 0;
+  var currentPixel = this.currentDrawn;
+  for (var i = 0; i < data.length; i++) {
+    var datum = data[i];
+    if (datum < min) {
+      min = datum;
+    }
+    if (datum > max) {
+      max = datum;
+    }
+
+    currentSample++;
+    if (currentSample === SAMPLES_PER_PIXEL) {
+      context.fillRect(currentPixel, (1 + min) * amp,
+                       1, Math.max(1, (max - min) * amp));
+      currentPixel++;
+      currentSample = 0;
+      min = 1.0;
+      max = -1.0;
+   }
   }
 };
 
