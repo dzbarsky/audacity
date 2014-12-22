@@ -6,6 +6,7 @@ var SAMPLES_PER_PIXEL = 200;
 
 var currentTrack;
 var tracks = []
+var nodes = {};
 
 function AudioTrack() {
   var domElement = document.createElement("div");
@@ -23,7 +24,7 @@ function AudioTrack() {
   this.finalBuffer = null;
 }
 
-AudioTrack.prototype.consolidateAudioBuffers = function() {
+AudioTrack.prototype.stopRecording = function() {
   var totalLength = 0;
   this.buffers.forEach(function (buffer) {
     totalLength += buffer.length;
@@ -39,6 +40,8 @@ AudioTrack.prototype.consolidateAudioBuffers = function() {
       currentLength += buffer.length;
     });
   }
+
+  delete this.buffers;
 };
 
 AudioTrack.prototype.addBufferSegment = function(bufferSegment) {
@@ -89,7 +92,9 @@ function setup() {
   document.getElementById('record').addEventListener('click', toggleRecord);
   document.getElementById('play').addEventListener('click', play);
   document.getElementById('pause').addEventListener('click', pause);
-  navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia;
+
+  document.body.addEventListener('keydown', keydown);
+  navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
   navigator.getUserMedia(
     { audio: true },
     success,
@@ -101,14 +106,32 @@ function setup() {
 
 function toggleRecord() {
   if (state === 'recording') {
-    document.getElementById('record').src = 'images/record.png';
     state = 'stopped';
-    currentTrack.consolidateAudioBuffers();
+    document.getElementById('record').src = 'images/record.png';
+    currentTrack.stopRecording();
+
+    nodes.streamSource.disconnect(nodes.scriptProcessor);
+    nodes.scriptProcessor.disconnect(context.destination);
   } else {
-    document.getElementById('record').src = 'images/stop.png';
     state = 'recording';
+    document.getElementById('record').src = 'images/stop.png';
     currentTrack = new AudioTrack();
     tracks.push(currentTrack);
+
+    nodes.streamSource.connect(nodes.scriptProcessor);
+    nodes.scriptProcessor.connect(context.destination);
+    // Should play back the other tracks here as you record.  Currently causes
+    // problems.
+    //play();
+  }
+}
+
+function keydown(e) {
+  console.log(e);
+
+  // Space
+  if (e.keyCode === 32) {
+    play();
   }
 }
 
@@ -122,17 +145,12 @@ function success(audioStream) {
   context = new AudioContext();
 
   //var volume = context.createGain();
-  var streamSource = context.createMediaStreamSource(audioStream);
-
-  var scriptProcessor = context.createScriptProcessor(4096, 2, 2);
-  scriptProcessor.onaudioprocess = function(e) {
+  nodes.streamSource = context.createMediaStreamSource(audioStream);
+  nodes.scriptProcessor = context.createScriptProcessor(4096, 2, 2);
+  nodes.scriptProcessor.onaudioprocess = function(e) {
     if (state === 'recording') {
       currentTrack.addBufferSegment(e.inputBuffer);
     }
   };
-
-  streamSource.connect(scriptProcessor);
-  scriptProcessor.connect(context.destination);
 }
-
 
