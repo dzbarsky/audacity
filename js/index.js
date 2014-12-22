@@ -12,10 +12,26 @@ function AudioTrack() {
   var domElement = document.createElement("div");
   document.getElementById('tracks').appendChild(domElement);
 
+  var closeButton = document.createElement("div");
+  closeButton.addEventListener('click', function() {
+    domElement.remove();
+    tracks.splice(tracks.indexOf(this), 1);
+  }.bind(this));
+  closeButton.textContent = 'X';
+  closeButton.classList.add('close-button');
+
+  var leftBar = document.createElement("div");
+  leftBar.classList.add('left-bar');
+  leftBar.appendChild(closeButton);
+  domElement.appendChild(leftBar);
+
+  var canvasContainer = document.createElement('div');
+  canvasContainer.classList.add('canvas-container');
+  domElement.appendChild(canvasContainer);
   this.canvases = [];
   for (var i = 0; i < 2; i++) {
     this.canvases.push(document.createElement("canvas"));
-    domElement.appendChild(this.canvases[i]);
+    canvasContainer.appendChild(this.canvases[i]);
 
     this.canvases[i].width = 0;
     this.canvases[i].height = 100;
@@ -68,12 +84,13 @@ AudioTrack.prototype.addBufferSegment = function(bufferSegment) {
                     bufferSegment.getChannelData(i));
   }
 
-  this.currentDrawn += bufferSegment.getChannelData(0).length / SAMPLES_PER_PIXEL;
+  this.currentDrawn += bufferSegment.length / SAMPLES_PER_PIXEL;
 };
 
 AudioTrack.prototype.drawBuffer = function(context, width, data) {
   var amp = this.canvases[0].height / 2;
   context.fillStyle = "silver";
+  console.log(width - this.currentDrawn)
   for (var i = 0; i < width - this.currentDrawn; i++){
     var min = 1.0;
     var max = -1.0;
@@ -100,6 +117,7 @@ function setup() {
   document.getElementById('record').addEventListener('click', toggleRecord);
   document.getElementById('play').addEventListener('click', play);
   document.getElementById('pause').addEventListener('click', pause);
+  document.getElementById('tracks').addEventListener('click', clickTrackHandler);
 
   document.body.addEventListener('keydown', keydown);
   navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
@@ -144,9 +162,18 @@ function keydown(e) {
 }
 
 function play() {
+  var playStart = Date.now();
   tracks.forEach(function(track) {
     track.play();
   });
+
+  var animateScrubber = function() {
+    var elapsed = Date.now() - playStart;
+    document.getElementById('scrubber').style.left =
+      elapsed /1000 * SAMPLES_PER_PIXEL + 'px';
+    requestAnimationFrame(animateScrubber);
+  };
+  requestAnimationFrame(animateScrubber);
 }
 
 function success(audioStream) {
@@ -162,3 +189,7 @@ function success(audioStream) {
   };
 }
 
+function clickTrackHandler(e) {
+  console.log(e);
+  document.getElementById('scrubber').style.left = e.clientX + 'px';
+}

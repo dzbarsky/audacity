@@ -1,0 +1,21 @@
+#scrubber {
+  width: 1px;
+  height: 200px;
+  position: absolute;
+  background-color: black;
+}
+
+.left-bar {
+  width: 100px;
+  height: 204px;
+  background-color: green;
+  display: inline-block;
+}
+
+.canvas-container {
+  display: inline-block;
+}
+
+.close-button {
+  position: absolute;
+}
