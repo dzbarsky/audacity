@@ -12,12 +12,16 @@ function AudioTrack() {
   var domElement = document.createElement("div");
   document.getElementById('tracks').appendChild(domElement);
 
-  this.canvas = document.createElement("canvas");
-  domElement.appendChild(this.canvas);
+  this.canvases = [];
+  for (var i = 0; i < 2; i++) {
+    this.canvases.push(document.createElement("canvas"));
+    domElement.appendChild(this.canvases[i]);
 
-  this.canvas.width = 0;
-  this.canvas.height = 100;
-  this.canvas.style.border = '1px solid red';
+    this.canvases[i].width = 0;
+    this.canvases[i].height = 100;
+    this.canvases[i].style.border = '1px solid red';
+    this.canvases[i].style.display = 'block';
+  }
 
   this.buffers = [];
   this.currentDrawn = 0;
@@ -47,25 +51,30 @@ AudioTrack.prototype.stopRecording = function() {
 AudioTrack.prototype.addBufferSegment = function(bufferSegment) {
   this.buffers.push(bufferSegment);
 
-  var canvasContext = this.canvas.getContext('2d');
-  var oldWidth = this.canvas.width;
-  if (oldWidth !== 0) {
-    var data = canvasContext.getImageData(0, 0, this.canvas.width, this.canvas.height);
-  }
-  this.canvas.width += bufferSegment.length / SAMPLES_PER_PIXEL;
+  for (var i = 0; i < 2; i++) {
+    var canvasContext = this.canvases[i].getContext('2d');
+    var oldWidth = this.canvases[i].width;
+    if (oldWidth !== 0) {
+      var data = canvasContext.getImageData(0, 0, this.canvases[i].width, this.canvases[i].height);
+    }
+    this.canvases[i].width += bufferSegment.length / SAMPLES_PER_PIXEL;
 
-  if (oldWidth !== 0) {
-    canvasContext.putImageData(data, 0, 0);
+    if (oldWidth !== 0) {
+      canvasContext.putImageData(data, 0, 0);
+    }
+
+    this.drawBuffer(canvasContext,
+                    this.canvases[i].width,
+                    bufferSegment.getChannelData(i));
   }
 
-  this.drawBuffer(canvasContext,
-                  bufferSegment.getChannelData(0));
+  this.currentDrawn += bufferSegment.getChannelData(0).length / SAMPLES_PER_PIXEL;
 };
 
-AudioTrack.prototype.drawBuffer = function(context, data) {
-  var amp = this.canvas.height / 2;
+AudioTrack.prototype.drawBuffer = function(context, width, data) {
+  var amp = this.canvases[0].height / 2;
   context.fillStyle = "silver";
-  for (var i = 0; i < this.canvas.width - this.currentDrawn; i++){
+  for (var i = 0; i < width - this.currentDrawn; i++){
     var min = 1.0;
     var max = -1.0;
     for (j = 0; j < SAMPLES_PER_PIXEL; j++) {
@@ -78,7 +87,6 @@ AudioTrack.prototype.drawBuffer = function(context, data) {
      context.fillRect(i + this.currentDrawn, (1 + min) * amp,
                       1, Math.max(1, (max - min) * amp));
   }
-  this.currentDrawn += data.length / SAMPLES_PER_PIXEL;
 };
 
 AudioTrack.prototype.play = function() {
