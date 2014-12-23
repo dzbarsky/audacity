@@ -119,9 +119,23 @@ AudioTrack.prototype.drawBuffer = function(context, width, data) {
 };
 
 AudioTrack.prototype.play = function() {
+  this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
+  this.scriptProcessor.onaudioprocess = function(e) {
+    var style = document.getElementById('scrubber').style;
+    var left = style.left;
+    style.left = Number(left.substring(0, left.length - 2)) + 1 + 'px';
+
+    for (var i = 0; i < 2; i++) {
+      e.outputBuffer.copyToChannel(e.inputBuffer.getChannelData(i), i);
+    }
+  };
+  this.scriptProcessor.connect(context.destination);
+
   this.source = context.createBufferSource();
-  this.source.buffer = this.finalBuffer;
+  this.source.connect(this.scriptProcessor);
   this.source.connect(context.destination);
+
+  this.source.buffer = this.finalBuffer;
   var offsetIntoBuffer =
     this.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
   this.source.start(0, offsetIntoBuffer);
@@ -132,6 +146,8 @@ AudioTrack.prototype.stop = function() {
   this.scrubberIndex =
     Math.floor((scrubber.getBoundingClientRect().left -
                   this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
+  this.source.disconnect(this.scriptProcessor);
+  this.scriptProcessor.disconnect(context.destination);
   this.source.stop();
 };
 
@@ -205,25 +221,15 @@ function keydown(e) {
 }
 
 function stop() {
-  cancelAnimationFrame(scrubberAnimationId);
   tracks.forEach(function(track) {
     track.stop();
   });
 }
 
 function play() {
-  var playStart = Date.now();
   tracks.forEach(function(track) {
     track.play();
   });
-
-  var animateScrubber = function() {
-    var elapsed = Date.now() - playStart;
-    //document.getElementById('scrubber').style.left =
-     // elapsed / 1000 * SAMPLES_PER_PIXEL + 'px';
-    scrubberAnimationId = requestAnimationFrame(animateScrubber);
-  };
-  scrubberAnimationId = requestAnimationFrame(animateScrubber);
 }
 
 function success(audioStream) {
