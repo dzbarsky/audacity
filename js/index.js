@@ -160,14 +160,11 @@ AudioTrack.prototype.setScrubber = function(e) {
   var scrubber = document.getElementById('scrubber');
 
   var parent = e.target.parentNode;
-  var box = parent.getBoundingClientRect();
-
   parent.appendChild(scrubber);
-  scrubber.style.left = e.clientX + 'px';
-  console.log(box.top);
-  scrubber.style.top = box.top + 'px';
 
-  console.log(this.canvases[0].offsetLeft);
+  scrubber.style.left = e.clientX + 'px';
+  scrubber.style.top = parent.offsetTop + 'px';
+
   this.scrubberIndex = (e.clientX - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
 };
 
