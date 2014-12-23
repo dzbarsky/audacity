@@ -7,6 +7,7 @@ var SAMPLES_PER_PIXEL = 256;
 var currentTrack;
 var tracks = []
 var nodes = {};
+var scrubberAnimationId;
 
 function AudioTrack() {
   var closeButton = document.createElement("div");
@@ -118,7 +119,7 @@ AudioTrack.prototype.drawBuffer = function(context, width, data) {
 };
 
 AudioTrack.prototype.play = function() {
-  var source = context.createBufferSource();
+  this.source = context.createBufferSource();
 
   var newLength = this.finalBuffer.length - this.scrubberIndex;
   var playBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
@@ -126,13 +127,16 @@ AudioTrack.prototype.play = function() {
     playBuffer.copyToChannel(this.finalBuffer.getChannelData(i).subarray(this.scrubberIndex), i);
   }
 
-  source.buffer = playBuffer;
-  source.connect(context.destination);
-  source.start();
+  this.source.buffer = playBuffer;
+  this.source.connect(context.destination);
+  this.source.start();
+};
+
+AudioTrack.prototype.stop = function() {
+  this.source.stop();
 };
 
 AudioTrack.prototype.setScrubber = function(e) {
-  console.log(e);
   var scrubber = document.getElementById('scrubber');
 
   var parent = e.target.parentNode;
@@ -143,7 +147,8 @@ AudioTrack.prototype.setScrubber = function(e) {
   console.log(box.top);
   scrubber.style.top = box.top + 'px';
 
-  this.scrubberIndex = e.clientX * SAMPLES_PER_PIXEL;
+  console.log(this.canvases[0].offsetLeft);
+  this.scrubberIndex = (e.clientX - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
 };
 
 function setup() {
@@ -190,8 +195,21 @@ function keydown(e) {
 
   // Space
   if (e.keyCode === 32) {
-    play();
+    if (state === 'stopped') {
+      state = 'playing';
+      play();
+    } else if (state === 'playing'){
+      state = 'stopped';
+      stop();
+    }
   }
+}
+
+function stop() {
+  cancelAnimationFrame(scrubberAnimationId);
+  tracks.forEach(function(track) {
+    track.stop();
+  });
 }
 
 function play() {
@@ -204,9 +222,9 @@ function play() {
     var elapsed = Date.now() - playStart;
     document.getElementById('scrubber').style.left =
       elapsed / 1000 * SAMPLES_PER_PIXEL + 'px';
-    requestAnimationFrame(animateScrubber);
+    scrubberAnimationId = requestAnimationFrame(animateScrubber);
   };
-  requestAnimationFrame(animateScrubber);
+  scrubberAnimationId = requestAnimationFrame(animateScrubber);
 }
 
 function success(audioStream) {
