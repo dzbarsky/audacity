@@ -214,22 +214,22 @@ function keydown(e) {
   // Space
   if (e.keyCode === 32) {
     if (state === 'stopped') {
-      state = 'playing';
       play();
     } else if (state === 'playing'){
-      state = 'stopped';
       stop();
     }
   }
 }
 
 function stop() {
+  state = 'stopped';
   tracks.forEach(function(track) {
     track.stop();
   });
 }
 
 function play() {
+  state = 'playing';
   tracks.forEach(function(track) {
     track.play();
   });
