@@ -121,6 +121,7 @@ AudioTrack.prototype.drawBuffer = function(context, width, data) {
 AudioTrack.prototype.play = function() {
   this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
   this.scriptProcessor.onaudioprocess = function(e) {
+    //console.log(e);
     var style = document.getElementById('scrubber').style;
     var left = style.left;
     style.left = Number(left.substring(0, left.length - 2)) + 1 + 'px';
@@ -134,6 +135,7 @@ AudioTrack.prototype.play = function() {
   this.source = context.createBufferSource();
   this.source.connect(this.scriptProcessor);
   this.source.connect(context.destination);
+  this.source.onended = stop;
 
   this.source.buffer = this.finalBuffer;
   var offsetIntoBuffer =
@@ -142,6 +144,7 @@ AudioTrack.prototype.play = function() {
 };
 
 AudioTrack.prototype.stop = function() {
+  console.log('stopping');
   var scrubber = document.getElementById('scrubber');
   this.scrubberIndex =
     Math.floor((scrubber.getBoundingClientRect().left -
