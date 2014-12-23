@@ -124,7 +124,11 @@ AudioTrack.prototype.play = function() {
   var newLength = this.finalBuffer.length - this.scrubberIndex;
   var playBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
   for (var i = 0; i < 2; i++) {
+    try {
     playBuffer.copyToChannel(this.finalBuffer.getChannelData(i).subarray(this.scrubberIndex), i);
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   this.source.buffer = playBuffer;
@@ -133,6 +137,10 @@ AudioTrack.prototype.play = function() {
 };
 
 AudioTrack.prototype.stop = function() {
+  var scrubber = document.getElementById('scrubber');
+  this.scrubberIndex =
+    floor((scrubber.getBoundingClientRect().left -
+             this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
   this.source.stop();
 };
 
