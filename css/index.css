@@ -17,12 +17,17 @@
 }
 
 .track-control {
-  height: 204px;
+  height: 200px;
   background-color: green;
 }
 
 .canvas-container {
   display: inline-block;
+}
+
+canvas {
+  display: block;
+  border-right: 1px solid red;
 }
 
 .close-button {

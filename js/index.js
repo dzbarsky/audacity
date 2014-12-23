@@ -36,8 +36,6 @@ function AudioTrack() {
 
     this.canvases[i].width = 0;
     this.canvases[i].height = 100;
-    this.canvases[i].style.border = '1px solid red';
-    this.canvases[i].style.display = 'block';
   }
 
   this.buffers = [];
@@ -124,12 +122,16 @@ AudioTrack.prototype.play = function() {
     //console.log(e);
     var style = document.getElementById('scrubber').style;
     var left = style.left;
-    style.left = Number(left.substring(0, left.length - 2)) + 1 + 'px';
+    var leftNum = Number(left.substring(0, left.length - 2));
+
+    if (leftNum < this.canvases[0].getBoundingClientRect().right) {
+      style.left = leftNum + 1 + 'px';
+    }
 
     for (var i = 0; i < 2; i++) {
       e.outputBuffer.copyToChannel(e.inputBuffer.getChannelData(i), i);
     }
-  };
+  }.bind(this);
   this.scriptProcessor.connect(context.destination);
 
   this.source = context.createBufferSource();
