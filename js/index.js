@@ -120,27 +120,18 @@ AudioTrack.prototype.drawBuffer = function(context, width, data) {
 
 AudioTrack.prototype.play = function() {
   this.source = context.createBufferSource();
-
-  var newLength = this.finalBuffer.length - this.scrubberIndex;
-  var playBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
-  for (var i = 0; i < 2; i++) {
-    try {
-    playBuffer.copyToChannel(this.finalBuffer.getChannelData(i).subarray(this.scrubberIndex), i);
-    } catch (e) {
-      console.log(e);
-    }
-  }
-
-  this.source.buffer = playBuffer;
+  this.source.buffer = this.finalBuffer;
   this.source.connect(context.destination);
-  this.source.start();
+  var offsetIntoBuffer =
+    this.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
+  this.source.start(0, offsetIntoBuffer);
 };
 
 AudioTrack.prototype.stop = function() {
   var scrubber = document.getElementById('scrubber');
   this.scrubberIndex =
-    floor((scrubber.getBoundingClientRect().left -
-             this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
+    Math.floor((scrubber.getBoundingClientRect().left -
+                  this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
   this.source.stop();
 };
 
@@ -228,8 +219,8 @@ function play() {
 
   var animateScrubber = function() {
     var elapsed = Date.now() - playStart;
-    document.getElementById('scrubber').style.left =
-      elapsed / 1000 * SAMPLES_PER_PIXEL + 'px';
+    //document.getElementById('scrubber').style.left =
+     // elapsed / 1000 * SAMPLES_PER_PIXEL + 'px';
     scrubberAnimationId = requestAnimationFrame(animateScrubber);
   };
   scrubberAnimationId = requestAnimationFrame(animateScrubber);
