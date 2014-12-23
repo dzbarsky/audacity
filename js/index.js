@@ -7,7 +7,6 @@ var SAMPLES_PER_PIXEL = 256;
 var currentTrack;
 var tracks = []
 var nodes = {};
-var scrubberAnimationId;
 
 function AudioTrack() {
   var closeButton = document.createElement("div");
@@ -28,6 +27,10 @@ function AudioTrack() {
   canvasContainer.track = this;
   canvasContainer.classList.add('canvas-container');
   document.getElementById('track-container').appendChild(canvasContainer);
+
+  this.scrubber = document.createElement('div');
+  this.scrubber.classList.add('scrubber');
+  canvasContainer.appendChild(this.scrubber);
 
   this.canvases = [];
   for (var i = 0; i < 2; i++) {
@@ -120,7 +123,7 @@ AudioTrack.prototype.play = function() {
   this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
   this.scriptProcessor.onaudioprocess = function(e) {
     //console.log(e);
-    var style = document.getElementById('scrubber').style;
+    var style = this.scrubber.style;
     var left = style.left;
     var leftNum = Number(left.substring(0, left.length - 2));
 
@@ -137,7 +140,7 @@ AudioTrack.prototype.play = function() {
   this.source = context.createBufferSource();
   this.source.connect(this.scriptProcessor);
   this.source.connect(context.destination);
-  this.source.onended = stop;
+  this.source.onended = this.stop.bind(this);
 
   this.source.buffer = this.finalBuffer;
   var offsetIntoBuffer =
@@ -147,25 +150,17 @@ AudioTrack.prototype.play = function() {
 
 AudioTrack.prototype.stop = function() {
   console.log('stopping');
-  var scrubber = document.getElementById('scrubber');
   this.scrubberIndex =
-    Math.floor((scrubber.getBoundingClientRect().left -
+    Math.floor((this.scrubber.getBoundingClientRect().left -
                   this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
   this.source.disconnect(this.scriptProcessor);
   this.scriptProcessor.disconnect(context.destination);
   this.source.stop();
 };
 
-AudioTrack.prototype.setScrubber = function(e) {
-  var scrubber = document.getElementById('scrubber');
-
-  var parent = e.target.parentNode;
-  parent.appendChild(scrubber);
-
-  scrubber.style.left = e.clientX + 'px';
-  scrubber.style.top = parent.offsetTop + 'px';
-
-  this.scrubberIndex = (e.clientX - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
+AudioTrack.prototype.setScrubberPosition = function(pos) {
+  this.scrubber.style.left = pos + 'px';
+  this.scrubberIndex = (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
 };
 
 function setup() {
@@ -248,6 +243,7 @@ function success(audioStream) {
 }
 
 function clickTrackHandler(e) {
-  var track = e.target.parentNode.track;
-  track.setScrubber(e);
+  tracks.forEach(function (track) {
+    track.setScrubberPosition(e.clientX);
+  });
 }
