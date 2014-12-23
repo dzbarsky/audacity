@@ -36,11 +36,11 @@ class AudioEditorTrack {
 
     constructor() {
         var closeButton = document.createElement("div");
-        closeButton.addEventListener('click', function() {
+        closeButton.addEventListener('click', () => {
             trackControl.remove();
             canvasContainer.remove();
             tracks.splice(tracks.indexOf(this), 1);
-        }.bind(this));
+        });
         closeButton.textContent = 'X';
         closeButton.classList.add('close-button');
 

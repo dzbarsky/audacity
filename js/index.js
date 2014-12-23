@@ -1,11 +1,12 @@
 var AudioEditorTrack = (function () {
     function AudioEditorTrack() {
+        var _this = this;
         var closeButton = document.createElement("div");
         closeButton.addEventListener('click', function () {
             trackControl.remove();
             canvasContainer.remove();
-            tracks.splice(tracks.indexOf(this), 1);
-        }.bind(this));
+            tracks.splice(tracks.indexOf(_this), 1);
+        });
         closeButton.textContent = 'X';
         closeButton.classList.add('close-button');
         var trackControl = document.createElement("div");
