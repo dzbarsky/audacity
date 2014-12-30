@@ -22,7 +22,7 @@
 }
 
 .canvas-container {
-  display: inline-block;
+  display: block;
 }
 
 canvas {
