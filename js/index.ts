@@ -23,108 +23,53 @@ interface AudioNode {
     stop(when ? : number)
 }
 
-class AudioEditorTrack {
+class AudioTrackVisualization {
 
-    muted: boolean;
+
+    currentDrawn: number;
+    canvases: HTMLCanvasElement[];
     scrubber: HTMLDivElement;
     scrubberIndex: number;
-    buffers: AudioBuffer[];
-    canvases: HTMLCanvasElement[];
-    finalBuffer: AudioBuffer;
-    currentDrawn: number;
 
-    scriptProcessor: AudioNode;
-    volumeControl: AudioNode;
-    source: AudioNode;
+    canvasContainer: HTMLDivElement;
 
     canvasWithoutHighlight: ImageData[];
+    track: AudioEditorTrack;
 
     highlightStartPosition: number;
     highlightEndPosition: number;
 
-    constructor() {
-        var closeButton = document.createElement("div");
-        closeButton.addEventListener('click', () => {
-            trackControl.remove();
-            canvasContainer.remove();
-            tracks.splice(tracks.indexOf(this), 1);
-        });
-        closeButton.textContent = 'X';
-        closeButton.classList.add('close-button');
-
-        var muteButton = document.createElement("div");
-        muteButton.addEventListener('click', () => {
-
-            this.muted = !this.muted;
-            if (this.muted) {
-                this.volumeControl.gain.value = 0;
-                muteButton.textContent = 'Unmute';
-            } else {
-                this.volumeControl.gain.value = 1;
-                muteButton.textContent = 'Mute';
-            }
-        });
-
-        muteButton.textContent = 'Mute';
-        muteButton.classList.add('mute-button');
-
-        var trackControl = document.createElement("div");
-        trackControl.classList.add('track-control');
-        trackControl.appendChild(closeButton);
-        trackControl.appendChild(muteButton);
-        document.getElementById('track-control-container').appendChild(trackControl);
-
-        var canvasContainer = document.createElement('div');
-        canvasContainer.addEventListener("mousedown", mousedownCanvasHandler);
-        (<any>canvasContainer).track = this;
-        canvasContainer.classList.add('canvas-container');
-        document.getElementById('track-container').appendChild(canvasContainer);
+    constructor(track: AudioEditorTrack) {
+        this.canvasContainer = document.createElement('div');
+        this.canvasContainer.addEventListener("mousedown", mousedownCanvasHandler);
+        (<any>this.canvasContainer).track = track;
+        this.track = track;
+        this.canvasContainer.classList.add('canvas-container');
+        document.getElementById('track-container').appendChild(this.canvasContainer);
 
         this.scrubber = document.createElement('div');
         this.scrubber.classList.add('scrubber');
-        canvasContainer.appendChild(this.scrubber);
+        this.canvasContainer.appendChild(this.scrubber);
 
         this.canvases = [];
         for (var i = 0; i < 2; i++) {
             this.canvases.push(document.createElement("canvas"));
-            canvasContainer.appendChild(this.canvases[i]);
+            this.canvasContainer.appendChild(this.canvases[i]);
 
             this.canvases[i].width = 0;
             this.canvases[i].height = 100;
         }
 
-        this.volumeControl = context.createGain();
-        this.muted = false;
-        this.buffers = [];
-        this.currentDrawn = 0;
-        this.finalBuffer = null;
-
         this.canvasWithoutHighlight = [];
+
+        this.currentDrawn = 0;
     }
 
-    stopRecording() {
-        var totalLength = 0;
-        this.buffers.forEach(function(buffer) {
-            totalLength += buffer.length;
-        });
-
-        this.finalBuffer = context.createBuffer(2, totalLength, this.buffers[0].sampleRate);
-        for (var i = 0; i < 2; i++) {
-            var channel = this.finalBuffer.getChannelData(i);
-
-            var currentLength = 0;
-            this.buffers.forEach(function(buffer) {
-                channel.set(buffer.getChannelData(i), currentLength);
-                currentLength += buffer.length;
-            });
-        }
-
-        delete this.buffers;
+    remove() {
+        this.canvasContainer.remove();
     }
 
     addBufferSegment(bufferSegment: AudioBuffer) {
-        this.buffers.push(bufferSegment);
-
         for (var i = 0; i < 2; i++) {
             var canvasContext = this.canvases[i].getContext('2d');
             var oldWidth = this.canvases[i].width;
@@ -175,46 +120,34 @@ class AudioEditorTrack {
             }
         }
     }
-    play() {
-        this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
-        this.scriptProcessor.onaudioprocess = function(e) {
-            //console.log(e);
-            var style = this.scrubber.style;
-            var left = style.left;
-            var leftNum = Number(left.substring(0, left.length - 2));
 
-            if (leftNum < this.canvases[0].getBoundingClientRect().right) {
-                style.left = leftNum + 1 + 'px';
-            }
-        }.bind(this);
+    advanceScrubber() {
+        var style = this.scrubber.style;
+        var left = style.left;
+        var leftNum = Number(left.substring(0, left.length - 2));
 
-        this.source = context.createBufferSource();
-        this.source.connect(this.scriptProcessor);
-        this.source.connect(this.volumeControl);
-        this.volumeControl.connect(context.destination);
+        if (leftNum < this.canvases[0].getBoundingClientRect().right) {
+            style.left = leftNum + 1 + 'px';
+        }
 
-        this.source.onended = this.stop.bind(this);
-
-        this.source.buffer = this.finalBuffer;
-        var offsetIntoBuffer =
-            this.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
-        this.source.start(0, offsetIntoBuffer);
+        this.scrubberIndex = Math.floor(leftNum + 1 - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     }
 
-    stop() {
-        console.log('stopping');
-        this.scrubberIndex =
-            Math.floor((this.scrubber.getBoundingClientRect().left -
-                this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
-        this.source.disconnect(this.scriptProcessor);
-        this.source.disconnect(this.volumeControl);
-        this.volumeControl.disconnect(context.destination);
-        this.source.stop();
-    }
     setScrubberPosition(pos: number) {
         this.scrubber.style.left = pos + 'px';
         this.scrubberIndex = this.pixelToArrayPosition(pos);
     }
+
+    drawAudioBuffer() {
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = this.canvases[i].getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.currentDrawn = 0;
+            this.drawBuffer(ctx, canvas.width, this.track.finalBuffer.getChannelData(i));
+        }
+    }
+
     startHighlight(pos: number) {
         this.highlightStartPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {
@@ -246,10 +179,120 @@ class AudioEditorTrack {
     pixelToArrayPosition(pos: number) {
         return (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     }
+}
+
+class AudioEditorTrack {
+
+    muted: boolean;
+    buffers: AudioBuffer[];
+    visual: AudioTrackVisualization;
+    finalBuffer: AudioBuffer;
+
+    scriptProcessor: AudioNode;
+    volumeControl: AudioNode;
+    source: AudioNode;
+
+    constructor() {
+        var closeButton = document.createElement("div");
+        closeButton.addEventListener('click', () => {
+            trackControl.remove();
+            this.visual.remove();
+            tracks.splice(tracks.indexOf(this), 1);
+        });
+        closeButton.textContent = 'X';
+        closeButton.classList.add('close-button');
+
+        var muteButton = document.createElement("div");
+        muteButton.addEventListener('click', () => {
+
+            this.muted = !this.muted;
+            if (this.muted) {
+                this.volumeControl.gain.value = 0;
+                muteButton.textContent = 'Unmute';
+            } else {
+                this.volumeControl.gain.value = 1;
+                muteButton.textContent = 'Mute';
+            }
+        });
+
+        muteButton.textContent = 'Mute';
+        muteButton.classList.add('mute-button');
+
+        var trackControl = document.createElement("div");
+        trackControl.classList.add('track-control');
+        trackControl.appendChild(closeButton);
+        trackControl.appendChild(muteButton);
+        document.getElementById('track-control-container').appendChild(trackControl);
+
+        this.visual = new AudioTrackVisualization(this);
+
+        this.volumeControl = context.createGain();
+        this.muted = false;
+        this.buffers = [];
+        this.finalBuffer = null;
+    }
+
+    stopRecording() {
+        var totalLength = 0;
+        this.buffers.forEach(function(buffer) {
+            totalLength += buffer.length;
+        });
+
+        this.finalBuffer = context.createBuffer(2, totalLength, this.buffers[0].sampleRate);
+        for (var i = 0; i < 2; i++) {
+            var channel = this.finalBuffer.getChannelData(i);
+
+            var currentLength = 0;
+            this.buffers.forEach(function(buffer) {
+                channel.set(buffer.getChannelData(i), currentLength);
+                currentLength += buffer.length;
+            });
+        }
+
+        delete this.buffers;
+    }
+
+    addBufferSegment(bufferSegment: AudioBuffer) {
+        this.buffers.push(bufferSegment);
+        this.visual.addBufferSegment(bufferSegment);
+    }
+
+    play() {
+        this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
+        this.scriptProcessor.onaudioprocess = this.visual.advanceScrubber.bind(this.visual);
+
+        this.source = context.createBufferSource();
+        this.source.connect(this.scriptProcessor);
+        this.source.connect(this.volumeControl);
+        this.volumeControl.connect(context.destination);
+
+        this.source.onended = this.stop.bind(this);
+
+        this.source.buffer = this.finalBuffer;
+        var offsetIntoBuffer =
+            this.visual.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
+        this.source.start(0, offsetIntoBuffer);
+    }
+
+    stop() {
+        this.source.disconnect(this.scriptProcessor);
+        this.source.disconnect(this.volumeControl);
+        this.volumeControl.disconnect(context.destination);
+        this.source.stop();
+    }
+    setScrubberPosition(pos: number) {
+        this.visual.setScrubberPosition(pos);
+    }
+    startHighlight(pos: number) {
+        this.visual.startHighlight(pos);
+    }
+    updateHighlight(pos: number) {
+        this.visual.updateHighlight(pos);
+    }
 
     deleteSelection() {
-        var endIndex = this.highlightEndPosition * SAMPLES_PER_PIXEL;
-        var startIndex = this.highlightStartPosition * SAMPLES_PER_PIXEL;
+        var endIndex = this.visual.highlightEndPosition * SAMPLES_PER_PIXEL;
+        var startIndex = this.visual.highlightStartPosition * SAMPLES_PER_PIXEL;
         var newLength = this.finalBuffer.length - (endIndex - startIndex);
         var newBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
         for (var i = 0; i < 2; i++) {
@@ -258,20 +301,8 @@ class AudioEditorTrack {
         }
 
         this.finalBuffer = newBuffer;
-        this.redrawAudioBuffer();
+        this.visual.drawAudioBuffer();
     }
-
-    redrawAudioBuffer() {
-        for (var i = 0; i < 2; i++) {
-            var canvas = this.canvases[i];
-            var ctx = this.canvases[i].getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            this.currentDrawn = 0;
-            this.drawBuffer(ctx, canvas.width, this.finalBuffer.getChannelData(i));
-        }
-
-    }
-
 };
 
 enum State {

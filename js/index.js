@@ -1,73 +1,28 @@
-var AudioEditorTrack = (function () {
-    function AudioEditorTrack() {
-        var _this = this;
-        var closeButton = document.createElement("div");
-        closeButton.addEventListener('click', function () {
-            trackControl.remove();
-            canvasContainer.remove();
-            tracks.splice(tracks.indexOf(_this), 1);
-        });
-        closeButton.textContent = 'X';
-        closeButton.classList.add('close-button');
-        var muteButton = document.createElement("div");
-        muteButton.addEventListener('click', function () {
-            _this.muted = !_this.muted;
-            if (_this.muted) {
-                _this.volumeControl.gain.value = 0;
-                muteButton.textContent = 'Unmute';
-            }
-            else {
-                _this.volumeControl.gain.value = 1;
-                muteButton.textContent = 'Mute';
-            }
-        });
-        muteButton.textContent = 'Mute';
-        muteButton.classList.add('mute-button');
-        var trackControl = document.createElement("div");
-        trackControl.classList.add('track-control');
-        trackControl.appendChild(closeButton);
-        trackControl.appendChild(muteButton);
-        document.getElementById('track-control-container').appendChild(trackControl);
-        var canvasContainer = document.createElement('div');
-        canvasContainer.addEventListener("mousedown", mousedownCanvasHandler);
-        canvasContainer.track = this;
-        canvasContainer.classList.add('canvas-container');
-        document.getElementById('track-container').appendChild(canvasContainer);
+var AudioTrackVisualization = (function () {
+    function AudioTrackVisualization(track) {
+        this.canvasContainer = document.createElement('div');
+        this.canvasContainer.addEventListener("mousedown", mousedownCanvasHandler);
+        this.canvasContainer.track = track;
+        this.track = track;
+        this.canvasContainer.classList.add('canvas-container');
+        document.getElementById('track-container').appendChild(this.canvasContainer);
         this.scrubber = document.createElement('div');
         this.scrubber.classList.add('scrubber');
-        canvasContainer.appendChild(this.scrubber);
+        this.canvasContainer.appendChild(this.scrubber);
         this.canvases = [];
         for (var i = 0; i < 2; i++) {
             this.canvases.push(document.createElement("canvas"));
-            canvasContainer.appendChild(this.canvases[i]);
+            this.canvasContainer.appendChild(this.canvases[i]);
             this.canvases[i].width = 0;
             this.canvases[i].height = 100;
         }
-        this.volumeControl = context.createGain();
-        this.muted = false;
-        this.buffers = [];
-        this.currentDrawn = 0;
-        this.finalBuffer = null;
         this.canvasWithoutHighlight = [];
+        this.currentDrawn = 0;
     }
-    AudioEditorTrack.prototype.stopRecording = function () {
-        var totalLength = 0;
-        this.buffers.forEach(function (buffer) {
-            totalLength += buffer.length;
-        });
-        this.finalBuffer = context.createBuffer(2, totalLength, this.buffers[0].sampleRate);
-        for (var i = 0; i < 2; i++) {
-            var channel = this.finalBuffer.getChannelData(i);
-            var currentLength = 0;
-            this.buffers.forEach(function (buffer) {
-                channel.set(buffer.getChannelData(i), currentLength);
-                currentLength += buffer.length;
-            });
-        }
-        delete this.buffers;
+    AudioTrackVisualization.prototype.remove = function () {
+        this.canvasContainer.remove();
     };
-    AudioEditorTrack.prototype.addBufferSegment = function (bufferSegment) {
-        this.buffers.push(bufferSegment);
+    AudioTrackVisualization.prototype.addBufferSegment = function (bufferSegment) {
         for (var i = 0; i < 2; i++) {
             var canvasContext = this.canvases[i].getContext('2d');
             var oldWidth = this.canvases[i].width;
@@ -83,7 +38,7 @@ var AudioEditorTrack = (function () {
         this.currentDrawn += bufferSegment.length / SAMPLES_PER_PIXEL;
         this.scrubberIndex = 0;
     };
-    AudioEditorTrack.prototype.drawBuffer = function (context, width, data) {
+    AudioTrackVisualization.prototype.drawBuffer = function (context, width, data) {
         var amp = this.canvases[0].height / 2;
         context.globalAlpha = 1.0;
         context.fillStyle = "silver";
@@ -109,39 +64,29 @@ var AudioEditorTrack = (function () {
             }
         }
     };
-    AudioEditorTrack.prototype.play = function () {
-        this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
-        this.scriptProcessor.onaudioprocess = function (e) {
-            //console.log(e);
-            var style = this.scrubber.style;
-            var left = style.left;
-            var leftNum = Number(left.substring(0, left.length - 2));
-            if (leftNum < this.canvases[0].getBoundingClientRect().right) {
-                style.left = leftNum + 1 + 'px';
-            }
-        }.bind(this);
-        this.source = context.createBufferSource();
-        this.source.connect(this.scriptProcessor);
-        this.source.connect(this.volumeControl);
-        this.volumeControl.connect(context.destination);
-        this.source.onended = this.stop.bind(this);
-        this.source.buffer = this.finalBuffer;
-        var offsetIntoBuffer = this.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
-        this.source.start(0, offsetIntoBuffer);
+    AudioTrackVisualization.prototype.advanceScrubber = function () {
+        var style = this.scrubber.style;
+        var left = style.left;
+        var leftNum = Number(left.substring(0, left.length - 2));
+        if (leftNum < this.canvases[0].getBoundingClientRect().right) {
+            style.left = leftNum + 1 + 'px';
+        }
+        this.scrubberIndex = Math.floor(leftNum + 1 - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     };
-    AudioEditorTrack.prototype.stop = function () {
-        console.log('stopping');
-        this.scrubberIndex = Math.floor((this.scrubber.getBoundingClientRect().left - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
-        this.source.disconnect(this.scriptProcessor);
-        this.source.disconnect(this.volumeControl);
-        this.volumeControl.disconnect(context.destination);
-        this.source.stop();
-    };
-    AudioEditorTrack.prototype.setScrubberPosition = function (pos) {
+    AudioTrackVisualization.prototype.setScrubberPosition = function (pos) {
         this.scrubber.style.left = pos + 'px';
         this.scrubberIndex = this.pixelToArrayPosition(pos);
     };
-    AudioEditorTrack.prototype.startHighlight = function (pos) {
+    AudioTrackVisualization.prototype.drawAudioBuffer = function () {
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = this.canvases[i].getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.currentDrawn = 0;
+            this.drawBuffer(ctx, canvas.width, this.track.finalBuffer.getChannelData(i));
+        }
+    };
+    AudioTrackVisualization.prototype.startHighlight = function (pos) {
         this.highlightStartPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
@@ -155,7 +100,7 @@ var AudioEditorTrack = (function () {
             this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     };
-    AudioEditorTrack.prototype.updateHighlight = function (pos) {
+    AudioTrackVisualization.prototype.updateHighlight = function (pos) {
         this.highlightEndPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
@@ -164,12 +109,97 @@ var AudioEditorTrack = (function () {
             ctx.fillRect(this.highlightStartPosition, 0, this.highlightEndPosition - this.highlightStartPosition, canvas.height);
         }
     };
-    AudioEditorTrack.prototype.pixelToArrayPosition = function (pos) {
+    AudioTrackVisualization.prototype.pixelToArrayPosition = function (pos) {
         return (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     };
+    return AudioTrackVisualization;
+})();
+var AudioEditorTrack = (function () {
+    function AudioEditorTrack() {
+        var _this = this;
+        var closeButton = document.createElement("div");
+        closeButton.addEventListener('click', function () {
+            trackControl.remove();
+            _this.visual.remove();
+            tracks.splice(tracks.indexOf(_this), 1);
+        });
+        closeButton.textContent = 'X';
+        closeButton.classList.add('close-button');
+        var muteButton = document.createElement("div");
+        muteButton.addEventListener('click', function () {
+            _this.muted = !_this.muted;
+            if (_this.muted) {
+                _this.volumeControl.gain.value = 0;
+                muteButton.textContent = 'Unmute';
+            }
+            else {
+                _this.volumeControl.gain.value = 1;
+                muteButton.textContent = 'Mute';
+            }
+        });
+        muteButton.textContent = 'Mute';
+        muteButton.classList.add('mute-button');
+        var trackControl = document.createElement("div");
+        trackControl.classList.add('track-control');
+        trackControl.appendChild(closeButton);
+        trackControl.appendChild(muteButton);
+        document.getElementById('track-control-container').appendChild(trackControl);
+        this.visual = new AudioTrackVisualization(this);
+        this.volumeControl = context.createGain();
+        this.muted = false;
+        this.buffers = [];
+        this.finalBuffer = null;
+    }
+    AudioEditorTrack.prototype.stopRecording = function () {
+        var totalLength = 0;
+        this.buffers.forEach(function (buffer) {
+            totalLength += buffer.length;
+        });
+        this.finalBuffer = context.createBuffer(2, totalLength, this.buffers[0].sampleRate);
+        for (var i = 0; i < 2; i++) {
+            var channel = this.finalBuffer.getChannelData(i);
+            var currentLength = 0;
+            this.buffers.forEach(function (buffer) {
+                channel.set(buffer.getChannelData(i), currentLength);
+                currentLength += buffer.length;
+            });
+        }
+        delete this.buffers;
+    };
+    AudioEditorTrack.prototype.addBufferSegment = function (bufferSegment) {
+        this.buffers.push(bufferSegment);
+        this.visual.addBufferSegment(bufferSegment);
+    };
+    AudioEditorTrack.prototype.play = function () {
+        this.scriptProcessor = context.createScriptProcessor(SAMPLES_PER_PIXEL, 2, 2);
+        this.scriptProcessor.onaudioprocess = this.visual.advanceScrubber.bind(this.visual);
+        this.source = context.createBufferSource();
+        this.source.connect(this.scriptProcessor);
+        this.source.connect(this.volumeControl);
+        this.volumeControl.connect(context.destination);
+        this.source.onended = this.stop.bind(this);
+        this.source.buffer = this.finalBuffer;
+        var offsetIntoBuffer = this.visual.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
+        this.source.start(0, offsetIntoBuffer);
+    };
+    AudioEditorTrack.prototype.stop = function () {
+        this.source.disconnect(this.scriptProcessor);
+        this.source.disconnect(this.volumeControl);
+        this.volumeControl.disconnect(context.destination);
+        this.source.stop();
+    };
+    AudioEditorTrack.prototype.setScrubberPosition = function (pos) {
+        this.visual.setScrubberPosition(pos);
+    };
+    AudioEditorTrack.prototype.startHighlight = function (pos) {
+        this.visual.startHighlight(pos);
+    };
+    AudioEditorTrack.prototype.updateHighlight = function (pos) {
+        this.visual.updateHighlight(pos);
+    };
     AudioEditorTrack.prototype.deleteSelection = function () {
-        var endIndex = this.highlightEndPosition * SAMPLES_PER_PIXEL;
-        var startIndex = this.highlightStartPosition * SAMPLES_PER_PIXEL;
+        var endIndex = this.visual.highlightEndPosition * SAMPLES_PER_PIXEL;
+        var startIndex = this.visual.highlightStartPosition * SAMPLES_PER_PIXEL;
         var newLength = this.finalBuffer.length - (endIndex - startIndex);
         var newBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
         for (var i = 0; i < 2; i++) {
@@ -177,16 +207,7 @@ var AudioEditorTrack = (function () {
             newBuffer.getChannelData(i).set([].slice.call(this.finalBuffer.getChannelData(i), endIndex), startIndex);
         }
         this.finalBuffer = newBuffer;
-        this.redrawAudioBuffer();
-    };
-    AudioEditorTrack.prototype.redrawAudioBuffer = function () {
-        for (var i = 0; i < 2; i++) {
-            var canvas = this.canvases[i];
-            var ctx = this.canvases[i].getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            this.currentDrawn = 0;
-            this.drawBuffer(ctx, canvas.width, this.finalBuffer.getChannelData(i));
-        }
+        this.visual.drawAudioBuffer();
     };
     return AudioEditorTrack;
 })();
