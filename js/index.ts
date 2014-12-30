@@ -19,17 +19,20 @@ interface AudioNode {
     onended: Function;
     start(when ? : number, offset ? : number);
     buffer: AudioBuffer;
+    gain: any;
     stop(when ? : number)
 }
 
 class AudioEditorTrack {
 
+    muted: boolean;
     scrubber: HTMLDivElement;
     scrubberIndex: number;
     buffers: AudioBuffer[];
     canvases: HTMLCanvasElement[];
     finalBuffer: AudioBuffer;
     currentDrawn: number;
+    gainNode: AudioNode;
 
     scriptProcessor: AudioNode;
     source: AudioNode;
@@ -44,9 +47,26 @@ class AudioEditorTrack {
         closeButton.textContent = 'X';
         closeButton.classList.add('close-button');
 
+        var muteButton = document.createElement("div");
+        muteButton.addEventListener('click', () => {
+
+            this.muted = !this.muted;
+            if (this.muted) {
+                this.gainNode.gain.value = 0;
+                muteButton.textContent = 'Unmute';
+            } else {
+                this.gainNode.gain.value = 1;
+                muteButton.textContent = 'Mute';
+            }
+        });
+
+        muteButton.textContent = 'Mute';
+        muteButton.classList.add('mute-button');
+
         var trackControl = document.createElement("div");
         trackControl.classList.add('track-control');
         trackControl.appendChild(closeButton);
+        trackControl.appendChild(muteButton);
         document.getElementById('track-control-container').appendChild(trackControl);
 
         var canvasContainer = document.createElement('div');
@@ -67,6 +87,8 @@ class AudioEditorTrack {
             this.canvases[i].height = 100;
         }
 
+        this.gainNode = context.createGain();
+        this.muted = false;
         this.buffers = [];
         this.currentDrawn = 0;
         this.finalBuffer = null;
@@ -155,16 +177,13 @@ class AudioEditorTrack {
             if (leftNum < this.canvases[0].getBoundingClientRect().right) {
                 style.left = leftNum + 1 + 'px';
             }
-
-            for (var i = 0; i < 2; i++) {
-                e.outputBuffer.copyToChannel(e.inputBuffer.getChannelData(i), i);
-            }
         }.bind(this);
-        this.scriptProcessor.connect(context.destination);
 
         this.source = context.createBufferSource();
         this.source.connect(this.scriptProcessor);
-        this.source.connect(context.destination);
+        this.source.connect(this.gainNode);
+        this.gainNode.connect(context.destination);
+
         this.source.onended = this.stop.bind(this);
 
         this.source.buffer = this.finalBuffer;
@@ -179,7 +198,8 @@ class AudioEditorTrack {
             Math.floor((this.scrubber.getBoundingClientRect().left -
                 this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
         this.source.disconnect(this.scriptProcessor);
-        this.scriptProcessor.disconnect(context.destination);
+        this.source.disconnect(this.gainNode);
+        this.gainNode.disconnect(context.destination);
         this.source.stop();
     }
     setScrubberPosition(pos: number) {

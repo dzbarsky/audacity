@@ -9,9 +9,24 @@ var AudioEditorTrack = (function () {
         });
         closeButton.textContent = 'X';
         closeButton.classList.add('close-button');
+        var muteButton = document.createElement("div");
+        muteButton.addEventListener('click', function () {
+            _this.muted = !_this.muted;
+            if (_this.muted) {
+                _this.gainNode.gain.value = 0;
+                muteButton.textContent = 'Unmute';
+            }
+            else {
+                _this.gainNode.gain.value = 1;
+                muteButton.textContent = 'Mute';
+            }
+        });
+        muteButton.textContent = 'Mute';
+        muteButton.classList.add('mute-button');
         var trackControl = document.createElement("div");
         trackControl.classList.add('track-control');
         trackControl.appendChild(closeButton);
+        trackControl.appendChild(muteButton);
         document.getElementById('track-control-container').appendChild(trackControl);
         var canvasContainer = document.createElement('div');
         canvasContainer.track = this;
@@ -27,6 +42,8 @@ var AudioEditorTrack = (function () {
             this.canvases[i].width = 0;
             this.canvases[i].height = 100;
         }
+        this.gainNode = context.createGain();
+        this.muted = false;
         this.buffers = [];
         this.currentDrawn = 0;
         this.finalBuffer = null;
@@ -99,14 +116,11 @@ var AudioEditorTrack = (function () {
             if (leftNum < this.canvases[0].getBoundingClientRect().right) {
                 style.left = leftNum + 1 + 'px';
             }
-            for (var i = 0; i < 2; i++) {
-                e.outputBuffer.copyToChannel(e.inputBuffer.getChannelData(i), i);
-            }
         }.bind(this);
-        this.scriptProcessor.connect(context.destination);
         this.source = context.createBufferSource();
         this.source.connect(this.scriptProcessor);
-        this.source.connect(context.destination);
+        this.source.connect(this.gainNode);
+        this.gainNode.connect(context.destination);
         this.source.onended = this.stop.bind(this);
         this.source.buffer = this.finalBuffer;
         var offsetIntoBuffer = this.scrubberIndex / this.finalBuffer.length * this.finalBuffer.duration;
@@ -116,7 +130,8 @@ var AudioEditorTrack = (function () {
         console.log('stopping');
         this.scrubberIndex = Math.floor((this.scrubber.getBoundingClientRect().left - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
         this.source.disconnect(this.scriptProcessor);
-        this.scriptProcessor.disconnect(context.destination);
+        this.source.disconnect(this.gainNode);
+        this.gainNode.disconnect(context.destination);
         this.source.stop();
     };
     AudioEditorTrack.prototype.setScrubberPosition = function (pos) {

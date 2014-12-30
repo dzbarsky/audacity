@@ -33,3 +33,8 @@ canvas {
 .close-button {
   position: absolute;
 }
+
+.mute-button {
+  position: absolute;
+  left: 40px;
+}
