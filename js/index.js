@@ -48,7 +48,7 @@ var AudioEditorTrack = (function () {
         this.buffers = [];
         this.currentDrawn = 0;
         this.finalBuffer = null;
-        this.canvasImageData = [];
+        this.canvasWithoutHighlight = [];
     }
     AudioEditorTrack.prototype.stopRecording = function () {
         var totalLength = 0;
@@ -85,6 +85,7 @@ var AudioEditorTrack = (function () {
     };
     AudioEditorTrack.prototype.drawBuffer = function (context, width, data) {
         var amp = this.canvases[0].height / 2;
+        context.globalAlpha = 1.0;
         context.fillStyle = "silver";
         var min = 1.0;
         var max = -1.0;
@@ -145,22 +146,47 @@ var AudioEditorTrack = (function () {
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
             var ctx = canvas.getContext('2d');
+            // Restore image data to clear previous highlight.
+            if (this.canvasWithoutHighlight[i]) {
+                ctx.putImageData(this.canvasWithoutHighlight[i], 0, 0);
+            }
             ctx.fillStyle = 'blue';
             ctx.globalAlpha = 0.2;
-            this.canvasImageData[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     };
-    AudioEditorTrack.prototype.updateHighligh = function (pos) {
+    AudioEditorTrack.prototype.updateHighlight = function (pos) {
         this.highlightEndPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
             var ctx = canvas.getContext('2d');
-            ctx.putImageData(this.canvasImageData[i], 0, 0);
+            ctx.putImageData(this.canvasWithoutHighlight[i], 0, 0);
             ctx.fillRect(this.highlightStartPosition, 0, this.highlightEndPosition - this.highlightStartPosition, canvas.height);
         }
     };
     AudioEditorTrack.prototype.pixelToArrayPosition = function (pos) {
         return (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
+    };
+    AudioEditorTrack.prototype.deleteSelection = function () {
+        var endIndex = this.highlightEndPosition * SAMPLES_PER_PIXEL;
+        var startIndex = this.highlightStartPosition * SAMPLES_PER_PIXEL;
+        var newLength = this.finalBuffer.length - (endIndex - startIndex);
+        var newBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
+        for (var i = 0; i < 2; i++) {
+            newBuffer.getChannelData(i).set([].slice.call(this.finalBuffer.getChannelData(i), 0, startIndex));
+            newBuffer.getChannelData(i).set([].slice.call(this.finalBuffer.getChannelData(i), endIndex), startIndex);
+        }
+        this.finalBuffer = newBuffer;
+        this.redrawAudioBuffer();
+    };
+    AudioEditorTrack.prototype.redrawAudioBuffer = function () {
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = this.canvases[i].getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.currentDrawn = 0;
+            this.drawBuffer(ctx, canvas.width, this.finalBuffer.getChannelData(i));
+        }
     };
     return AudioEditorTrack;
 })();
@@ -211,9 +237,16 @@ function toggleRecord() {
 }
 function keydown(e) {
     console.log(e);
-    // Space
-    if (e.keyCode === 32) {
-        togglePlayState();
+    switch (e.keyCode) {
+        case 32:
+            togglePlayState();
+            break;
+        case 8:
+            currentTrack.deleteSelection();
+            e.preventDefault();
+            break;
+        default:
+            console.log(e.keyCode);
     }
 }
 function togglePlayState() {
@@ -255,6 +288,7 @@ function clickTrackHandler(e) {
 function mousedownCanvasHandler(e) {
     console.log("mouse down");
     this.track.startHighlight(e.clientX);
+    currentTrack = this.track;
     this.addEventListener("mouseup", mouseupCanvasHandler);
     this.addEventListener("mousemove", mousemoveCanvasHandler);
 }
@@ -264,6 +298,6 @@ function mouseupCanvasHandler(e) {
     this.removeEventListener("mousemove", mousemoveCanvasHandler);
 }
 function mousemoveCanvasHandler(e) {
-    this.track.updateHighligh(e.clientX);
+    this.track.updateHighlight(e.clientX);
     console.log("mouse move!!: " + e);
 }

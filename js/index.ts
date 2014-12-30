@@ -37,7 +37,7 @@ class AudioEditorTrack {
     volumeControl: AudioNode;
     source: AudioNode;
 
-    canvasImageData: ImageData[];
+    canvasWithoutHighlight: ImageData[];
 
     highlightStartPosition: number;
     highlightEndPosition: number;
@@ -99,7 +99,7 @@ class AudioEditorTrack {
         this.currentDrawn = 0;
         this.finalBuffer = null;
 
-        this.canvasImageData = [];
+        this.canvasWithoutHighlight = [];
     }
 
     stopRecording() {
@@ -148,6 +148,7 @@ class AudioEditorTrack {
 
     drawBuffer(context: CanvasRenderingContext2D, width: number, data: Float32Array) {
         var amp = this.canvases[0].height / 2;
+        context.globalAlpha = 1.0;
         context.fillStyle = "silver";
 
         var min = 1.0;
@@ -219,17 +220,23 @@ class AudioEditorTrack {
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
             var ctx = canvas.getContext('2d');
+
+            // Restore image data to clear previous highlight.
+            if (this.canvasWithoutHighlight[i]) {
+                ctx.putImageData(this.canvasWithoutHighlight[i], 0, 0);
+            }
+
             ctx.fillStyle = 'blue';
             ctx.globalAlpha = 0.2;
-            this.canvasImageData[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     }
-    updateHighligh(pos: number) {
+    updateHighlight(pos: number) {
         this.highlightEndPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {
             var canvas = this.canvases[i];
             var ctx = canvas.getContext('2d');
-            ctx.putImageData(this.canvasImageData[i], 0, 0);
+            ctx.putImageData(this.canvasWithoutHighlight[i], 0, 0);
             ctx.fillRect(this.highlightStartPosition, 0,
                          this.highlightEndPosition - this.highlightStartPosition, canvas.height);
         }
@@ -239,6 +246,32 @@ class AudioEditorTrack {
     pixelToArrayPosition(pos: number) {
         return (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     }
+
+    deleteSelection() {
+        var endIndex = this.highlightEndPosition * SAMPLES_PER_PIXEL;
+        var startIndex = this.highlightStartPosition * SAMPLES_PER_PIXEL;
+        var newLength = this.finalBuffer.length - (endIndex - startIndex);
+        var newBuffer = context.createBuffer(2, newLength, this.finalBuffer.sampleRate);
+        for (var i = 0; i < 2; i++) {
+            newBuffer.getChannelData(i).set([].slice.call(this.finalBuffer.getChannelData(i), 0, startIndex));
+            newBuffer.getChannelData(i).set([].slice.call(this.finalBuffer.getChannelData(i), endIndex), startIndex);
+        }
+
+        this.finalBuffer = newBuffer;
+        this.redrawAudioBuffer();
+    }
+
+    redrawAudioBuffer() {
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = this.canvases[i].getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.currentDrawn = 0;
+            this.drawBuffer(ctx, canvas.width, this.finalBuffer.getChannelData(i));
+        }
+
+    }
+
 };
 
 enum State {
@@ -302,8 +335,17 @@ function keydown(e) {
     console.log(e);
 
     // Space
-    if (e.keyCode === 32) {
-        togglePlayState();
+    switch (e.keyCode) {
+        case 32: //Space
+            togglePlayState();
+            break;
+        case 8: //Backspace
+            currentTrack.deleteSelection();
+            e.preventDefault();
+            break;
+        default:
+            console.log(e.keyCode);
+
     }
 }
 
@@ -351,6 +393,7 @@ function clickTrackHandler(e) {
 function mousedownCanvasHandler(e) {
     console.log("mouse down");
     this.track.startHighlight(e.clientX);
+    currentTrack = this.track;
     this.addEventListener("mouseup", mouseupCanvasHandler);
     this.addEventListener("mousemove", mousemoveCanvasHandler);
 }
@@ -362,7 +405,7 @@ function mouseupCanvasHandler(e) {
 }
 
 function mousemoveCanvasHandler(e) {
-    this.track.updateHighligh(e.clientX);
+    this.track.updateHighlight(e.clientX);
     console.log("mouse move!!: " + e);
 }
 
