@@ -32,10 +32,15 @@ class AudioEditorTrack {
     canvases: HTMLCanvasElement[];
     finalBuffer: AudioBuffer;
     currentDrawn: number;
-    gainNode: AudioNode;
 
     scriptProcessor: AudioNode;
+    volumeControl: AudioNode;
     source: AudioNode;
+
+    canvasImageData: ImageData[];
+
+    highlightStartPosition: number;
+    highlightEndPosition: number;
 
     constructor() {
         var closeButton = document.createElement("div");
@@ -52,10 +57,10 @@ class AudioEditorTrack {
 
             this.muted = !this.muted;
             if (this.muted) {
-                this.gainNode.gain.value = 0;
+                this.volumeControl.gain.value = 0;
                 muteButton.textContent = 'Unmute';
             } else {
-                this.gainNode.gain.value = 1;
+                this.volumeControl.gain.value = 1;
                 muteButton.textContent = 'Mute';
             }
         });
@@ -70,6 +75,7 @@ class AudioEditorTrack {
         document.getElementById('track-control-container').appendChild(trackControl);
 
         var canvasContainer = document.createElement('div');
+        canvasContainer.addEventListener("mousedown", mousedownCanvasHandler);
         (<any>canvasContainer).track = this;
         canvasContainer.classList.add('canvas-container');
         document.getElementById('track-container').appendChild(canvasContainer);
@@ -87,11 +93,13 @@ class AudioEditorTrack {
             this.canvases[i].height = 100;
         }
 
-        this.gainNode = context.createGain();
+        this.volumeControl = context.createGain();
         this.muted = false;
         this.buffers = [];
         this.currentDrawn = 0;
         this.finalBuffer = null;
+
+        this.canvasImageData = [];
     }
 
     stopRecording() {
@@ -181,8 +189,8 @@ class AudioEditorTrack {
 
         this.source = context.createBufferSource();
         this.source.connect(this.scriptProcessor);
-        this.source.connect(this.gainNode);
-        this.gainNode.connect(context.destination);
+        this.source.connect(this.volumeControl);
+        this.volumeControl.connect(context.destination);
 
         this.source.onended = this.stop.bind(this);
 
@@ -198,13 +206,38 @@ class AudioEditorTrack {
             Math.floor((this.scrubber.getBoundingClientRect().left -
                 this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL);
         this.source.disconnect(this.scriptProcessor);
-        this.source.disconnect(this.gainNode);
-        this.gainNode.disconnect(context.destination);
+        this.source.disconnect(this.volumeControl);
+        this.volumeControl.disconnect(context.destination);
         this.source.stop();
     }
     setScrubberPosition(pos: number) {
         this.scrubber.style.left = pos + 'px';
-        this.scrubberIndex = (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
+        this.scrubberIndex = this.pixelToArrayPosition(pos);
+    }
+    startHighlight(pos: number) {
+        this.highlightStartPosition = (pos - this.canvases[0].offsetLeft);
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'blue';
+            ctx.globalAlpha = 0.2;
+            this.canvasImageData[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+    }
+    updateHighligh(pos: number) {
+        this.highlightEndPosition = (pos - this.canvases[0].offsetLeft);
+        for (var i = 0; i < 2; i++) {
+            var canvas = this.canvases[i];
+            var ctx = canvas.getContext('2d');
+            ctx.putImageData(this.canvasImageData[i], 0, 0);
+            ctx.fillRect(this.highlightStartPosition, 0,
+                         this.highlightEndPosition - this.highlightStartPosition, canvas.height);
+        }
+
+    }
+
+    pixelToArrayPosition(pos: number) {
+        return (pos - this.canvases[0].offsetLeft) * SAMPLES_PER_PIXEL;
     }
 };
 
@@ -227,7 +260,8 @@ function setup() {
     document.getElementById('record').addEventListener('click', toggleRecord);
     document.getElementById('play').addEventListener('click', togglePlayState);
     document.getElementById('pause').addEventListener('click', togglePlayState);
-    document.getElementById('track-container').addEventListener('click', clickTrackHandler);
+
+    document.getElementById('track-container').addEventListener('mousedown', clickTrackHandler);
 
     document.body.addEventListener('keydown', keydown);
     var n = < any > navigator;
@@ -313,3 +347,22 @@ function clickTrackHandler(e) {
         track.setScrubberPosition(e.clientX);
     });
 }
+
+function mousedownCanvasHandler(e) {
+    console.log("mouse down");
+    this.track.startHighlight(e.clientX);
+    this.addEventListener("mouseup", mouseupCanvasHandler);
+    this.addEventListener("mousemove", mousemoveCanvasHandler);
+}
+
+function mouseupCanvasHandler(e) {
+    console.log("mouse up");
+    this.removeEventListener("mouseup", mouseupCanvasHandler);
+    this.removeEventListener("mousemove", mousemoveCanvasHandler);
+}
+
+function mousemoveCanvasHandler(e) {
+    this.track.updateHighligh(e.clientX);
+    console.log("mouse move!!: " + e);
+}
+
