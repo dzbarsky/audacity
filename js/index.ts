@@ -25,7 +25,6 @@ interface AudioNode {
 
 class AudioTrackVisualization {
 
-
     currentDrawn: number;
     canvases: HTMLCanvasElement[];
     scrubber: HTMLDivElement;
@@ -145,6 +144,7 @@ class AudioTrackVisualization {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             this.currentDrawn = 0;
             this.drawBuffer(ctx, canvas.width, this.track.finalBuffer.getChannelData(i));
+            this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     }
 
@@ -164,6 +164,7 @@ class AudioTrackVisualization {
             this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     }
+
     updateHighlight(pos: number) {
         this.highlightEndPosition = (pos - this.canvases[0].offsetLeft);
         for (var i = 0; i < 2; i++) {

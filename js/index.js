@@ -84,6 +84,7 @@ var AudioTrackVisualization = (function () {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             this.currentDrawn = 0;
             this.drawBuffer(ctx, canvas.width, this.track.finalBuffer.getChannelData(i));
+            this.canvasWithoutHighlight[i] = ctx.getImageData(0, 0, canvas.width, canvas.height);
         }
     };
     AudioTrackVisualization.prototype.startHighlight = function (pos) {
